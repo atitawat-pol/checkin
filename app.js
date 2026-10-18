@@ -64,7 +64,7 @@
   }
 
   function setButtons() {
-    const ok = state.ready && !state.busy && gpsFresh();
+    const ok = state.ready && !state.busy && gpsFresh() && deviceAllowed();
     $('btnIn').disabled = !ok;
     $('btnOut').disabled = !ok;
   }
@@ -128,6 +128,29 @@
     } finally {
       clearTimeout(t);
     }
+  }
+
+  // ---- มือถือประจำร้าน: รหัสลับที่ได้ตอนลงทะเบียน เก็บไว้ในเครื่อง ----
+  const TOKEN_KEY = 'checkin.deviceToken';
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+  function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+  const deviceAllowed = () => !!state.cfg && (!state.cfg.requireDevice || !!state.device);
+
+  function branchName(id) {
+    const b = state.cfg && (state.cfg.branches || []).find((x) => x.id === id);
+    return b ? b.name : id;
+  }
+
+  function renderDevice() {
+    if (!state.cfg) return;
+    if (state.device) {
+      setChip('devChip', '📱 ' + state.device.name, 'ok');
+    } else if (state.cfg.requireDevice) {
+      setChip('devChip', '📱 ไม่ใช่เครื่องของร้าน', 'bad');
+    } else {
+      setChip('devChip', '📱 เครื่องส่วนตัว', '');
+    }
+    setButtons();
   }
 
   function deviceInfo() {
@@ -381,7 +404,9 @@
         try {
           const r = await faceapi.detectSingleFace(video, detOpts());
           if (state.busy) { await sleep(300); continue; }
-          if (r) {
+          if (!deviceAllowed()) {
+            hint('เครื่องนี้ไม่ใช่มือถือประจำร้าน — ใช้เครื่องของร้านในการสแกน');
+          } else if (r) {
             guide('face');
             setChip('faceChip', '🙂 พบใบหน้า', 'ok');
             hint(gpsFresh() ? 'มองกล้องในกรอบ แล้วกด เข้างาน / ออกงาน' : 'รอตำแหน่ง GPS… (เปิด Location ของเครื่อง)');
@@ -401,6 +426,10 @@
   // ---------------------------------------------------------------
   async function doCheck(type) {
     if (state.busy) return;
+    if (!deviceAllowed()) {
+      showResult({ kind: 'err', icon: '📱', name: 'ไม่ใช่เครื่องของร้าน', meta: 'สแกนเข้า-ออกงานได้เฉพาะมือถือประจำร้าน' });
+      return;
+    }
     if (!gpsFresh()) {
       showResult({ kind: 'err', icon: '📍', name: 'ยังไม่ได้ตำแหน่ง GPS', meta: 'เปิด Location ของเครื่อง (ดึงแถบด้านบนลง > ตำแหน่ง) แล้วรอสักครู่' });
       return;
@@ -429,7 +458,7 @@
         action: 'checkin', type,
         descriptor: cap.descriptor, liveness: live,
         lat: p.lat, lng: p.lng, accuracy: p.acc,
-        photo: cap.photo, device: deviceInfo(),
+        photo: cap.photo, device: deviceInfo(), deviceToken: getToken(),
         clientTime: new Date().toISOString()
       });
 
@@ -438,7 +467,12 @@
         showResult({
           kind: isIn ? 'in' : 'out', icon: isIn ? '✅' : '👋',
           name: res.name, type: isIn ? 'เข้างาน' : 'ออกงาน', time: res.time.slice(0, 5),
-          meta: res.branchName + ' · ความเหมือน ' + res.similarity + '% · ห่าง ' + res.distanceM + ' ม.'
+          meta: [
+            res.shiftName || '',
+            !isIn && res.shiftHours != null ? 'ทำงาน ' + Number(res.shiftHours).toFixed(1) + ' ชม.' : '',
+            isIn && res.lateMin > 0 ? 'สาย ' + res.lateMin + ' นาที' : '',
+            res.branchName
+          ].filter(Boolean).join(' · ')
         });
         speak((isIn ? 'สวัสดี ' : 'ขอบคุณ ') + res.name);
       } else {
@@ -484,9 +518,54 @@
     } finally { $('pinOk').disabled = false; }
   };
 
+  function renderDeviceAdmin() {
+    const sel = $('devBranch');
+    sel.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = ''; all.textContent = 'ทุกสาขา';
+    sel.appendChild(all);
+    (state.cfg.branches || []).forEach((b) => {
+      const o = document.createElement('option');
+      o.value = b.id; o.textContent = b.name + ' (' + b.id + ')';
+      sel.appendChild(o);
+    });
+    if (state.device) {
+      $('devStatus').textContent = '✅ เครื่องนี้คือ "' + state.device.name + '" (' + state.device.id + ')' +
+        (state.device.branchId ? ' · ' + branchName(state.device.branchId) : ' · ทุกสาขา') +
+        ' — ลงทะเบียนใหม่ได้ถ้าต้องการเปลี่ยนชื่อ/สาขา';
+      $('devName').value = state.device.name;
+      sel.value = state.device.branchId || '';
+      $('devRegister').textContent = 'ลงทะเบียนใหม่';
+    } else {
+      $('devStatus').textContent = state.cfg.requireDevice
+        ? '⛔ เครื่องนี้ยังไม่ได้ลงทะเบียน — สแกนเข้างานไม่ได้ (ลงทะเบียนเฉพาะมือถือของร้าน)'
+        : 'เครื่องนี้ยังไม่ได้ลงทะเบียน (ตอนนี้ระบบยังไม่บังคับ)';
+      $('devRegister').textContent = 'ลงทะเบียนเครื่องนี้';
+    }
+  }
+
+  $('devRegister').onclick = async () => {
+    const name = $('devName').value.trim();
+    if (!name) { $('devName').focus(); return; }
+    $('devRegister').disabled = true;
+    try {
+      const r = await api({ action: 'registerDevice', pin: state.pin, name, branchId: $('devBranch').value,
+        oldToken: getToken(), model: deviceInfo() });
+      if (!r.ok) { $('devStatus').textContent = '❌ ' + r.message; return; }
+      setToken(r.token);
+      state.device = r.device;
+      renderDevice();
+      closeAdmin();
+      showResult({ kind: 'in', icon: '📱', name: r.device.name, type: 'เป็นมือถือประจำร้านแล้ว', meta: r.message });
+    } catch (e) {
+      $('devStatus').textContent = '❌ ' + (e.title || 'เชื่อมต่อไม่ได้');
+    } finally { $('devRegister').disabled = false; }
+  };
+
   async function showEnrollStep() {
     $('pinStep').style.display = 'none';
     $('enrollStep').style.display = '';
+    renderDeviceAdmin();
     $('empList').textContent = 'กำลังโหลดรายชื่อ…';
     try {
       const r = await api({ action: 'employees', pin: state.pin });
@@ -574,9 +653,10 @@
       await loadModels();
 
       setLoading('กำลังเชื่อมต่อเซิร์ฟเวอร์', 'ดึงการตั้งค่าร้าน', 80);
-      const cfg = await api({ action: 'config' });
+      const cfg = await api({ action: 'config', deviceToken: getToken() });
       if (!cfg.ok) throw new UserErr('โหลดการตั้งค่าไม่สำเร็จ', cfg.message || '');
       state.cfg = cfg;
+      state.device = cfg.device;
       state.offsetMs = new Date(cfg.serverTime).getTime() - Date.now();
       $('shopName').textContent = cfg.shopName;
 
@@ -588,6 +668,7 @@
       unblock();
       if (state.posErr === 1) gpsDeniedBlock();
       renderGps();
+      renderDevice();
       keepAwake();
       previewLoop();
     } catch (e) {
