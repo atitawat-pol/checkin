@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f1115">
+<meta name="mobile-web-app-capable" content="yes">
+<title>เช็คชื่อพนักงาน</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #2a2f3a;
+    --text: #f2f3f5;
+    --muted: #9aa1ad;
+    --in: #22c55e;
+    --in-ink: #052e14;
+    --out: #f59e0b;
+    --out-ink: #3a2300;
+    --bad: #ef4444;
+    --accent: #60a5fa;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; overflow: hidden; }
+  button { font: inherit; border: 0; cursor: pointer; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  #app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+
+  /* --- Top bar --- */
+  header { padding: calc(env(safe-area-inset-top) + 12px) 16px 10px; display: flex; align-items: flex-end;
+    justify-content: space-between; gap: 12px; background: linear-gradient(var(--bg), transparent); z-index: 2; }
+  .shop { font-size: 14px; color: var(--muted); }
+  #clock { font-size: 40px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+  #date { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .chips { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .chip { font-size: 12px; padding: 5px 10px; border-radius: 999px; background: var(--panel);
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .chip.ok { color: var(--in); border-color: #1f5130; }
+  .chip.bad { color: var(--bad); border-color: #5b2323; }
+  #adminBtn { background: none; color: var(--muted); font-size: 20px; padding: 4px 6px; }
+
+  /* --- Camera stage --- */
+  #stage { position: relative; overflow: hidden; margin: 0 12px; border-radius: 20px; background: #000; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  #guide { position: absolute; inset: 0; pointer-events: none; }
+  #guide .oval { position: absolute; left: 50%; top: 46%; width: 62%; aspect-ratio: 3/4; max-height: 78%;
+    transform: translate(-50%, -50%); border-radius: 50%; border: 3px dashed rgba(255,255,255,.45);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.35); transition: border-color .2s; }
+  #guide.face .oval { border-style: solid; border-color: var(--accent); }
+  #guide.live .oval { border-color: var(--out); }
+  #guide.good .oval { border-color: var(--in); }
+  #hint { position: absolute; left: 12px; right: 12px; bottom: 14px; text-align: center; font-size: 18px;
+    font-weight: 500; padding: 10px 14px; border-radius: 14px; background: rgba(15,17,21,.75);
+    backdrop-filter: blur(6px); }
+  #arrow { position: absolute; top: 46%; left: 50%; transform: translate(-50%,-50%); font-size: 64px;
+    opacity: 0; transition: opacity .2s; text-shadow: 0 2px 12px #000; }
+  #arrow.show { opacity: 1; animation: sway 1.2s ease-in-out infinite; }
+  @keyframes sway { 0%,100% { transform: translate(-80%,-50%);} 50% { transform: translate(-20%,-50%);} }
+
+  /* --- Buttons --- */
+  footer { padding: 14px 12px calc(env(safe-area-inset-bottom) + 14px); display: grid;
+    grid-template-columns: 1fr 1fr; gap: 12px; }
+  .big { height: 76px; border-radius: 18px; font-size: 22px; font-weight: 700; display: flex;
+    align-items: center; justify-content: center; gap: 10px; transition: transform .08s, opacity .2s; }
+  .big:active { transform: scale(.97); }
+  .big:disabled { opacity: .35; }
+  #btnIn { background: var(--in); color: var(--in-ink); }
+  #btnOut { background: var(--out); color: var(--out-ink); }
+
+  /* --- Overlays --- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(10,11,14,.92); backdrop-filter: blur(8px); text-align: center; }
+  .overlay.show { display: flex; }
+  .card { width: 100%; max-width: 420px; }
+  .big-icon { font-size: 84px; line-height: 1; }
+  .res-name { font-size: 30px; font-weight: 700; margin-top: 12px; }
+  .res-type { font-size: 22px; margin-top: 6px; }
+  .res-time { font-size: 56px; font-weight: 700; margin-top: 10px; letter-spacing: -1px; }
+  .res-meta { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  #result.in .res-type, #result.in .res-time { color: var(--in); }
+  #result.out .res-type, #result.out .res-time { color: var(--out); }
+  #result.err .res-type { color: var(--bad); }
+  .msg-title { font-size: 22px; font-weight: 700; margin: 14px 0 8px; }
+  .msg-body { color: var(--muted); line-height: 1.6; white-space: pre-line; }
+  .btn { height: 52px; padding: 0 22px; border-radius: 14px; background: var(--text); color: var(--bg);
+    font-weight: 700; font-size: 17px; margin-top: 20px; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .bar { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 18px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--line);
+    border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- Admin panel --- */
+  #admin .card { text-align: left; }
+  #admin h2 { margin: 0 0 4px; font-size: 22px; }
+  #admin p { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+  input { width: 100%; height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel);
+    color: var(--text); font: inherit; font-size: 18px; padding: 0 14px; }
+  input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .row { display: flex; gap: 10px; margin-top: 20px; }
+  .row .btn { flex: 1; margin-top: 0; }
+  .dots { display: flex; gap: 8px; margin-top: 10px; }
+  .dots span { width: 14px; height: 14px; border-radius: 50%; background: var(--line); }
+  .dots span.on { background: var(--in); }
+  #empList { margin-top: 14px; font-size: 14px; color: var(--muted); max-height: 140px; overflow: auto; }
+  #enrollBanner { position: absolute; top: 12px; left: 12px; right: 12px; text-align: center; padding: 8px;
+    border-radius: 12px; background: rgba(96,165,250,.9); color: #071526; font-weight: 700; display: none; }
+  #enrollBanner.show { display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <div class="shop" id="shopName">กำลังโหลด…</div>
+      <div id="clock" class="mono">--:--:--</div>
+      <div id="date">&nbsp;</div>
+    </div>
+    <div class="chips">
+      <button id="adminBtn" aria-label="ผู้ดูแล">⚙︎</button>
+      <div class="chip" id="gpsChip">📍 รอ GPS…</div>
+      <div class="chip" id="faceChip">🙂 รอกล้อง…</div>
+    </div>
+  </header>
+
+  <div id="stage">
+    <video id="video" autoplay muted playsinline></video>
+    <div id="guide"><div class="oval"></div></div>
+    <div id="arrow">↔</div>
+    <div id="enrollBanner"></div>
+    <div id="hint">กำลังเตรียมระบบ…</div>
+  </div>
+
+  <footer>
+    <button class="big" id="btnIn" disabled>➜ เข้างาน</button>
+    <button class="big" id="btnOut" disabled>ออกงาน ➜</button>
+  </footer>
+</div>
+
+<!-- Loading / blocking errors -->
+<div class="overlay show" id="loading">
+  <div class="card">
+    <div class="spinner" id="loadSpin"></div>
+    <div class="msg-title" id="loadTitle">กำลังเตรียมระบบ</div>
+    <div class="msg-body" id="loadBody">โหลดโมเดลจดจำใบหน้า (ครั้งแรกอาจใช้เวลา 10–30 วินาที)</div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <button class="btn" id="loadRetry" style="display:none">ลองใหม่</button>
+  </div>
+</div>
+
+<!-- Result -->
+<div class="overlay" id="result">
+  <div class="card">
+    <div class="big-icon" id="resIcon">✅</div>
+    <div class="res-name" id="resName"></div>
+    <div class="res-type" id="resType"></div>
+    <div class="res-time mono" id="resTime"></div>
+    <div class="res-meta" id="resMeta"></div>
+    <button class="btn ghost" id="resClose">ปิด</button>
+  </div>
+</div>
+
+<!-- Admin -->
+<div class="overlay" id="admin">
+  <div class="card">
+    <div id="pinStep">
+      <h2>ผู้ดูแลระบบ</h2>
+      <p>ใส่ PIN เพื่อลงทะเบียนใบหน้าพนักงาน</p>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN">
+      <div class="row">
+        <button class="btn ghost" data-close>ยกเลิก</button>
+        <button class="btn" id="pinOk">ตกลง</button>
+      </div>
+    </div>
+    <div id="enrollStep" style="display:none">
+      <h2>ลงทะเบียนใบหน้า</h2>
+      <p>ถ้ารหัสเดิมมีอยู่แล้ว ระบบจะแทนที่ใบหน้าเดิม</p>
+      <label for="empId">รหัสพนักงาน</label>
+      <input id="empId" autocomplete="off" placeholder="เช่น E001">
+      <label for="empName">ชื่อเล่น / ชื่อที่จะแสดง</label>
+      <input id="empName" autocomplete="off" placeholder="เช่น น้องมิ้นท์">
+      <div class="row">
+        <button class="btn ghost" data-close>ปิด</button>
+        <button class="btn" id="enrollStart">เริ่มถ่ายหน้า</button>
+      </div>
+      <div id="empList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
