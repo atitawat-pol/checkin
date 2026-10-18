@@ -47,7 +47,7 @@
   }
 
   /** หน้าจอบล็อก: ใช้งานต่อไม่ได้จนกว่าจะแก้ (เช่น ไม่ให้สิทธิ์กล้อง/GPS) */
-  function block(title, body, retry) {
+  function block(title, body, retry, label) {
     $('loading').classList.add('show');
     $('loadSpin').style.display = 'none';
     $('loadTitle').textContent = '⚠️ ' + title;
@@ -55,6 +55,7 @@
     $('loadBar').parentElement.style.display = 'none';
     const btn = $('loadRetry');
     btn.style.display = '';
+    btn.textContent = label || 'ลองใหม่';
     btn.onclick = retry || (() => location.reload());
   }
 
@@ -166,6 +167,28 @@
   // ---------------------------------------------------------------
   // Camera (บังคับกล้องหน้า)
   // ---------------------------------------------------------------
+  // ---- เปิดจากในแอป LINE / Facebook / IG ฯลฯ: เบราว์เซอร์ในแอปมักไม่ให้ใช้กล้อง → พาไปเปิดใน Chrome ----
+  function inAppBrowser() {
+    const ua = navigator.userAgent || '';
+    if (/\bLine\//i.test(ua)) return 'LINE';
+    if (/FBAN|FBAV|FB_IAB|FBIOS|Messenger/i.test(ua)) return 'Facebook';
+    if (/Instagram/i.test(ua)) return 'Instagram';
+    if (/TikTok|musical_ly|BytedanceWebview/i.test(ua)) return 'TikTok';
+    if (/Android/i.test(ua) && /; wv\)/.test(ua)) return 'แอปอื่น';
+    return null;
+  }
+
+  function openInChrome() {
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      location.href = 'intent://' + location.host + location.pathname +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+        encodeURIComponent(location.origin + location.pathname + '?openExternalBrowser=1') + ';end';
+    } else {
+      location.href = location.origin + location.pathname + '?openExternalBrowser=1';
+    }
+  }
+
   async function startCamera() {
     if (!window.isSecureContext) {
       throw new UserErr('ต้องเปิดผ่าน https', 'กล้องและ GPS ใช้ได้เฉพาะเว็บที่เป็น https เท่านั้น');
@@ -182,7 +205,9 @@
     } catch (e) {
       if (e.name === 'NotAllowedError') {
         throw new UserErr('ไม่ได้อนุญาตให้ใช้กล้อง',
-          'แตะไอคอน 🔒 ข้างช่อง URL (หรือ ตั้งค่าแอป > สิทธิ์) แล้วเปิด "กล้อง" เป็นอนุญาต จากนั้นกด ลองใหม่');
+          'แตะไอคอน 🔒 ข้างช่อง URL > สิทธิ์ > กล้อง > อนุญาต แล้วกด ลองใหม่\n' +
+          'ถ้ายังไม่ได้: ตั้งค่ามือถือ > แอป > Chrome > สิทธิ์ > กล้อง > อนุญาต\n' +
+          '(ถ้ากดปุ่มอนุญาตไม่ติด ให้ปิดปุ่มลอยของแอปอื่น เช่น Grab ชั่วคราว)');
       }
       throw new UserErr('เปิดกล้องไม่ได้', 'ปิดแอปอื่นที่ใช้กล้องอยู่ แล้วกด ลองใหม่\n(' + e.name + ')');
     }
@@ -642,6 +667,14 @@
     try {
       if (!C || !C.API_URL || C.API_URL.includes('วาง_')) {
         throw new UserErr('ยังไม่ได้ตั้งค่า', 'ใส่ URL ของ Apps Script ในไฟล์ config.js ก่อนใช้งาน');
+      }
+      const iab = inAppBrowser();
+      if (iab) {
+        block('กรุณาเปิดด้วย Chrome',
+          'ตอนนี้เปิดอยู่ในเบราว์เซอร์ของ ' + iab + ' ซึ่งไม่อนุญาตให้ใช้กล้อง\n' +
+          'กดปุ่มด้านล่างเพื่อเปิดใน Chrome\n(หรือกด ⋮ แล้วเลือก "เปิดในเบราว์เซอร์อื่น")',
+          openInChrome, 'เปิดใน Chrome');
+        return;
       }
       setLoading('กำลังเปิดกล้อง', 'กรุณากด "อนุญาต" เมื่อมีหน้าต่างถามสิทธิ์', 10);
       await startCamera();

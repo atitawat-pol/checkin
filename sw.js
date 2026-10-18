@@ -1,5 +1,5 @@
 // Service worker: ทำให้ติดตั้งเป็นแอปได้ และเก็บโมเดล AI ไว้ในเครื่อง (เปิดครั้งต่อไปเร็วขึ้น)
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL = `shell-${VERSION}`;
 const CDN = `cdn-${VERSION}`;
 const SHELL_FILES = ['./', 'index.html', 'app.js', 'config.js', 'manifest.webmanifest',
