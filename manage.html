@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>จัดการเวลาเข้างาน</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#f2f3f5; --muted:#9aa1ad;
+    --in:#22c55e; --out:#f59e0b; --bad:#ef4444; --accent:#60a5fa; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
+  body { padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 90px); max-width: 640px; margin: 0 auto; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { border: 0; cursor: pointer; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  h1 { font-size: 20px; margin: 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .hidden { display: none !important; }
+
+  .field { width: 100%; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); padding: 0 12px; font-size: 16px; }
+  textarea.field { height: 70px; padding: 10px 12px; resize: vertical; }
+  .field:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .btn { height: 48px; padding: 0 18px; border-radius: 12px; background: var(--text); color: var(--bg); font-weight: 700; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .btn.small { height: 36px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
+  .btn.danger { background: transparent; color: var(--bad); border: 1px solid #5b2323; }
+  .btn:disabled { opacity: .4; }
+
+  /* login */
+  #login { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+
+  /* top */
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .datebar { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 8px; margin-bottom: 14px; }
+  .datebar .field { text-align: center; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+  .pill.bad { color: var(--bad); border-color: #5b2323; }
+  .pill.warn { color: var(--out); border-color: #5a3d0b; }
+  .pill.ok { color: var(--in); border-color: #1f5130; }
+
+  /* cards */
+  .sec { font-size: 13px; color: var(--muted); margin: 18px 0 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; width: 100%; text-align: left; display: block; }
+  .card:active { background: var(--panel2); }
+  .card .name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .times { font-size: 15px; margin-top: 4px; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .card.absent { border-color: #5b2323; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .tag.bad { color: var(--bad); border-color: #5b2323; }
+  .tag.warn { color: var(--out); border-color: #5a3d0b; }
+  .tag.ok { color: var(--in); border-color: #1f5130; }
+  .tag.edit { color: var(--accent); border-color: #1e3a5f; }
+  a { color: var(--accent); }
+
+  /* sheet */
+  #sheet { position: fixed; inset: 0; background: rgba(10,11,14,.88); backdrop-filter: blur(6px); z-index: 10; display: none; overflow-y: auto; }
+  #sheet.show { display: block; }
+  #sheet .inner { max-width: 640px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+  .log { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+  .log.void { opacity: .45; text-decoration: line-through; }
+  .log .acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .fail { font-size: 13px; padding: 8px 10px; border-left: 3px solid var(--bad); background: #1d1416; border-radius: 8px; margin-bottom: 6px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .chip { font-size: 13px; padding: 6px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .chip.on { border-color: var(--accent); color: var(--accent); }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .seg button { height: 44px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; }
+  .seg button.on.in { background: var(--in); color: #052e14; border-color: var(--in); }
+  .seg button.on.out { background: var(--out); color: #3a2300; border-color: var(--out); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 16px); max-width: 600px; margin: 0 auto;
+    padding: 12px 14px; border-radius: 12px; background: var(--text); color: var(--bg); font-weight: 500; z-index: 20; display: none; }
+  #toast.show { display: block; }
+  #toast.err { background: var(--bad); color: #fff; }
+  #fab { position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 16px); height: 52px; padding: 0 18px; border-radius: 26px;
+    background: var(--accent); color: #071526; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.4); z-index: 5; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>จัดการเวลาเข้างาน</h1>
+  <div class="muted">สำหรับผู้จัดการ — แก้เวลาเมื่อพนักงานสแกนไม่ติด / ลืมสแกน</div>
+  <input id="pin" class="field" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN ผู้จัดการ">
+  <button id="loginBtn" class="btn">เข้าสู่ระบบ</button>
+  <div id="loginErr" class="muted" style="color:var(--bad)"></div>
+</div>
+
+<div id="main" class="hidden">
+  <header>
+    <div class="grow">
+      <h1>เวลาเข้างาน</h1>
+      <div class="muted" id="who"></div>
+    </div>
+    <button class="btn ghost small" id="reload">↻ โหลดใหม่</button>
+  </header>
+  <div class="datebar">
+    <button class="btn ghost" id="prev">◀</button>
+    <input type="date" id="date" class="field">
+    <button class="btn ghost" id="next">▶</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="list"></div>
+</div>
+<button id="fab" class="hidden">＋ เพิ่มการสแกน</button>
+
+<div id="sheet"><div class="inner" id="sheetInner"></div></div>
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  'use strict';
+  const C = window.APP_CONFIG;
+  const $ = (id) => document.getElementById(id);
+  const S = { pin: '', who: '', employees: [], branches: [], date: '', day: null };
+  const REASONS = ['สแกนหน้าไม่ติด', 'ลืมสแกน', 'มือถือร้าน/เน็ตมีปัญหา', 'สแกนผิดปุ่ม (เข้า/ออก)'];
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const tm = (iso) => iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : '–';
+  const dm = (iso) => iso ? new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }) : '';
+  const localInput = (iso) => { // ISO → 'YYYY-MM-DDTHH:mm' เวลาไทย
+    const d = new Date(new Date(iso).getTime() + 7 * 3600000);
+    return d.toISOString().slice(0, 16);
+  };
+  const addDays = (ds, n) => { const d = new Date(ds + 'T12:00:00+07:00'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+  let toastT;
+  function toast(msg, err) {
+    const t = $('toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+    clearTimeout(toastT); toastT = setTimeout(() => (t.className = ''), err ? 5000 : 3000);
+  }
+
+  async function api(payload) {
+    const r = await fetch(C.API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ pin: S.pin }, payload)) });
+    const j = JSON.parse(await r.text());
+    if (!j.ok && /PIN/.test(j.message || '')) { logout(); throw new Error(j.message); }
+    return j;
+  }
+
+  // ---------- login ----------
+  function logout() {
+    S.pin = ''; try { sessionStorage.removeItem('mgrPin'); } catch (e) {}
+    $('main').classList.add('hidden'); $('fab').classList.add('hidden'); $('login').classList.remove('hidden');
+  }
+  async function login(pin) {
+    $('loginBtn').disabled = true; $('loginErr').textContent = '';
+    try {
+      S.pin = pin;
+      const r = await api({ action: 'mgrLogin' });
+      if (!r.ok) throw new Error(r.message);
+      try { sessionStorage.setItem('mgrPin', pin); } catch (e) {}
+      Object.assign(S, { who: r.who, employees: r.employees, branches: r.branches });
+      $('who').textContent = 'ผู้ใช้: ' + r.who;
+      $('login').classList.add('hidden'); $('main').classList.remove('hidden'); $('fab').classList.remove('hidden');
+      setDate(r.today);
+    } catch (e) {
+      $('loginErr').textContent = e.message || 'เชื่อมต่อไม่ได้'; S.pin = '';
+    } finally { $('loginBtn').disabled = false; }
+  }
+  $('loginBtn').onclick = () => { const p = $('pin').value.trim(); if (p) login(p); };
+  $('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
+
+  // ---------- day view ----------
+  function setDate(d) { S.date = d; $('date').value = d; load(); }
+  $('prev').onclick = () => setDate(addDays(S.date, -1));
+  $('next').onclick = () => setDate(addDays(S.date, 1));
+  $('date').onchange = () => $('date').value && setDate($('date').value);
+  $('reload').onclick = () => load();
+
+  async function load() {
+    $('list').innerHTML = '<div class="muted">กำลังโหลด…</div>';
+    try {
+      const r = await api({ action: 'mgrDay', date: S.date });
+      if (!r.ok) throw new Error(r.message);
+      S.day = r; render();
+    } catch (e) { $('list').innerHTML = '<div class="muted" style="color:var(--bad)">' + esc(e.message || 'โหลดไม่สำเร็จ') + '</div>'; }
+  }
+
+  function failsOf(name) { return (S.day.failed || []).filter((f) => f.guess && f.guess === name); }
+
+  function render() {
+    const d = S.day;
+    const people = {};
+    d.shifts.forEach((s) => { (people[s.empId] = people[s.empId] || { empId: s.empId, name: s.name, shifts: [], absent: [] }).shifts.push(s); });
+    d.absent.forEach((a) => { if (!people[a.empId] || !people[a.empId].shifts.some((s) => s.shift === a.shift && s.in)) (people[a.empId] = people[a.empId] || { empId: a.empId, name: a.name, shifts: [], absent: [] }).absent.push(a); });
+    const list = Object.values(people);
+    const late = d.shifts.filter((s) => Number(s.late) > 0).length;
+    const absentN = list.filter((p) => p.absent.length).length;
+    const forgot = d.shifts.filter((s) => /ลืม/.test(s.status)).length;
+    const unknownFails = d.failed.filter((f) => !f.guess);
+    $('stats').innerHTML =
+      '<span class="pill ok">เข้างาน ' + d.shifts.filter((s) => s.in).length + '</span>' +
+      (late ? '<span class="pill warn">สาย ' + late + '</span>' : '') +
+      (absentN ? '<span class="pill bad">ขาด ' + absentN + '</span>' : '') +
+      (forgot ? '<span class="pill warn">ลืมสแกน ' + forgot + '</span>' : '') +
+      (d.failed.length ? '<span class="pill bad">สแกนไม่ผ่าน ' + d.failed.length + ' ครั้ง</span>' : '');
+
+    const rank = (p) => (p.absent.length ? 0 : p.shifts.some((s) => /ลืม/.test(s.status)) ? 1 : p.shifts.some((s) => Number(s.late) > 0) ? 2 : 3);
+    list.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+
+    let html = '';
+    if (!list.length) html += '<div class="muted">ไม่มีข้อมูลการเข้างานของวันนี้</div>';
+    list.forEach((p) => {
+      const fails = failsOf(p.name);
+      const lines = p.shifts.map((s) => {
+        const tags = [];
+        if (Number(s.late) > 0) tags.push('<span class="tag warn">สาย ' + s.late + ' น.</span>');
+        if (/ลืม/.test(s.status)) tags.push('<span class="tag bad">' + esc(s.status) + '</span>');
+        if (d.logs.some((l) => l.empId === p.empId && l.manual && !l.void)) tags.push('<span class="tag edit">แก้ไขแล้ว</span>');
+        return '<div class="times"><span class="mono">' + tm(s.in) + ' → ' + tm(s.out) + '</span> ' +
+          (s.hours !== '' && s.hours != null ? '<span class="muted">' + Number(s.hours).toFixed(1) + ' ชม.</span> ' : '') + tags.join(' ') + '</div>' +
+          '<div class="sub">' + esc(s.shift) + ' · ' + esc(s.branch) + '</div>';
+      }).join('');
+      const abs = p.absent.map((a) => '<div class="times"><span class="tag bad">ขาดงาน</span> <span class="muted">' + esc(a.shift) + ' · ' + esc(a.branch) + '</span></div>').join('');
+      const fl = fails.length ? '<div class="sub" style="color:var(--bad)">สแกนไม่ผ่าน ' + fails.length + ' ครั้ง (แรกสุด ' + tm(fails[0].ts) + ')</div>' : '';
+      html += '<button class="card' + (p.absent.length ? ' absent' : '') + '" data-emp="' + esc(p.empId) + '">' +
+        '<div class="row"><div class="name grow">' + esc(p.name) + '</div><span class="muted">แก้ไข ›</span></div>' + abs + lines + fl + '</button>';
+    });
+    if (unknownFails.length) {
+      html += '<div class="sec">สแกนไม่ผ่าน (ระบบไม่รู้ว่าเป็นใคร) — เปิดรูปดูได้</div>';
+      unknownFails.forEach((f) => {
+        html += '<div class="fail"><b class="mono">' + tm(f.ts) + '</b> ' + esc(f.reason) + (f.branch ? ' · ' + esc(f.branch) : '') +
+          (f.photo ? ' · <a href="' + esc(f.photo) + '" target="_blank" rel="noopener">ดูรูป</a>' : '') + '</div>';
+      });
+    }
+    $('list').innerHTML = html;
+    $('list').querySelectorAll('[data-emp]').forEach((b) => (b.onclick = () => openEditor(b.dataset.emp)));
+  }
+
+  // ---------- editor ----------
+  const sheet = $('sheet');
+  function closeSheet() { sheet.classList.remove('show'); document.body.style.overflow = ''; }
+  function openSheet(html) { $('sheetInner').innerHTML = html; sheet.classList.add('show'); document.body.style.overflow = 'hidden'; sheet.scrollTop = 0; }
+
+  function reasonBlock(id) {
+    return '<label>เหตุผล (จำเป็น)</label><div class="chips" data-for="' + id + '">' +
+      REASONS.map((r) => '<button type="button" class="chip">' + esc(r) + '</button>').join('') + '</div>' +
+      '<textarea id="' + id + '" class="field" placeholder="เช่น สแกนหน้าไม่ติด ผู้จัดการเห็นมาถึง 18:58"></textarea>';
+  }
+  function wireChips() {
+    sheet.querySelectorAll('.chips').forEach((box) => {
+      box.querySelectorAll('.chip').forEach((c) => (c.onclick = () => {
+        box.querySelectorAll('.chip').forEach((x) => x.classList.remove('on')); c.classList.add('on');
+        const ta = $(box.dataset.for); if (!ta.value || REASONS.indexOf(ta.value) >= 0) ta.value = c.textContent;
+      }));
+    });
+  }
+
+  function suggestTime(emp) {
+    const f = failsOf(emp.name)[0];
+    if (f) return localInput(f.ts);
+    const ab = S.day.absent.find((a) => a.empId === emp.empId);
+    return S.date + 'T' + (ab && /ดึก/.test(ab.shift) ? '19:00' : '07:00');
+  }
+
+  function openEditor(empId, blank) {
+    const emp = S.employees.find((e) => e.empId === empId) || { empId: empId, name: (S.day.logs.find((l) => l.empId === empId) || {}).name || empId };
+    const logs = S.day.logs.filter((l) => l.empId === empId).sort((a, b) => a.ts.localeCompare(b.ts));
+    const fails = failsOf(emp.name);
+    let h = '<div class="row" style="margin-bottom:10px"><div class="grow">' +
+      (blank ? '<h1>เพิ่มการสแกน</h1>' : '<h1>' + esc(emp.name) + '</h1><div class="muted">' + esc(emp.empId) + ' · วันทำงาน ' + esc(S.date) + '</div>') +
+      '</div><button class="btn ghost small" id="closeS">ปิด</button></div>';
+
+    if (blank) {
+      h += '<label>พนักงาน</label><select id="empSel" class="field">' + S.employees.map((e) => '<option value="' + esc(e.empId) + '">' + esc(e.name) + ' (' + esc(e.empId) + ')</option>').join('') + '</select>';
+    }
+    if (!blank) {
+      if (fails.length) {
+        h += '<div class="sec">หลักฐาน: สแกนไม่ผ่าน</div>' + fails.map((f) => '<div class="fail"><b class="mono">' + dm(f.ts) + ' ' + tm(f.ts) + '</b> ' + esc(f.reason) +
+          (f.photo ? ' · <a href="' + esc(f.photo) + '" target="_blank" rel="noopener">ดูรูป</a>' : '') + '</div>').join('');
+      }
+      h += '<div class="sec">การสแกน (วันนี้ถึงเช้าวันถัดไป)</div>';
+      if (!logs.length) h += '<div class="muted">ยังไม่มีการสแกน</div>';
+      logs.forEach((l) => {
+        h += '<div class="log' + (l.void ? ' void' : '') + '"><div class="row"><span class="tag ' + (l.type === 'IN' ? 'ok' : 'warn') + '">' + (l.type === 'IN' ? 'เข้า' : 'ออก') + '</span>' +
+          '<b class="mono">' + dm(l.ts) + ' ' + tm(l.ts) + '</b><span class="muted grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(l.branch) + '</span>' +
+          (l.photo ? '<a href="' + esc(l.photo) + '" target="_blank" rel="noopener">รูป</a>' : '') + '</div>' +
+          (l.manual ? '<div class="sub muted">✎ ' + esc(l.note) + '</div>' : '') + (l.void ? '<div class="sub muted">' + esc(l.note) + '</div>' : '') +
+          (l.void ? '' : '<div class="acts"><button class="btn ghost small" data-edit="' + l.row + '">แก้เวลา</button><button class="btn danger small" data-void="' + l.row + '">ยกเลิกรายการนี้</button></div>' +
+            '<div class="editbox hidden" id="eb' + l.row + '"><label>เวลาที่ถูกต้อง</label><input type="datetime-local" class="field" id="w' + l.row + '" value="' + localInput(l.ts) + '">' +
+            '<label>ประเภท</label><div class="seg" id="t' + l.row + '"><button type="button" class="in' + (l.type === 'IN' ? ' on' : '') + '" data-v="IN">เข้างาน</button><button type="button" class="out' + (l.type === 'OUT' ? ' on' : '') + '" data-v="OUT">ออกงาน</button></div>' +
+            reasonBlock('r' + l.row) + '<div class="row" style="margin-top:10px"><button class="btn grow" data-save="' + l.row + '">บันทึกการแก้ไข</button></div></div>' +
+            '<div class="voidbox hidden" id="vb' + l.row + '">' + reasonBlock('rv' + l.row) + '<div class="row" style="margin-top:10px"><button class="btn danger grow" data-dovoid="' + l.row + '">ยืนยันยกเลิก</button></div></div>') +
+          '</div>';
+      });
+      h += '<div class="sec">เพิ่มการสแกนที่ขาดไป</div>';
+    }
+    h += '<label>ประเภท</label><div class="seg" id="addType"><button type="button" class="in on" data-v="IN">เข้างาน</button><button type="button" class="out" data-v="OUT">ออกงาน</button></div>' +
+      '<label>เวลา</label><input type="datetime-local" class="field" id="addWhen" value="' + suggestTime(emp) + '">' +
+      '<label>สาขา</label><select id="addBranch" class="field"><option value="">สาขาประจำของพนักงาน</option>' + S.branches.map((b) => '<option>' + esc(b.name) + '</option>').join('') + '</select>' +
+      reasonBlock('addReason') +
+      '<div class="row" style="margin-top:12px"><button class="btn grow" id="addSave">เพิ่มการสแกน</button></div>' +
+      '<p class="muted">ทุกการแก้ไขจะถูกบันทึกในชีต Corrections พร้อมชื่อผู้แก้และเหตุผล ข้อมูลเดิมไม่ถูกลบ</p>';
+    openSheet(h);
+    wireChips();
+    $('closeS').onclick = closeSheet;
+    sheet.querySelectorAll('.seg').forEach((seg) => seg.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+      seg.querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on');
+    })));
+    const segVal = (id) => { const on = $(id).querySelector('.on'); return on ? on.dataset.v : ''; };
+    sheet.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { $('vb' + b.dataset.edit).classList.add('hidden'); $('eb' + b.dataset.edit).classList.toggle('hidden'); }));
+    sheet.querySelectorAll('[data-void]').forEach((b) => (b.onclick = () => { $('eb' + b.dataset.void).classList.add('hidden'); $('vb' + b.dataset.void).classList.toggle('hidden'); }));
+    const logBy = (row) => logs.find((l) => String(l.row) === String(row));
+    sheet.querySelectorAll('[data-save]').forEach((b) => (b.onclick = () => {
+      const l = logBy(b.dataset.save);
+      submit(b, { op: 'edit', row: l.row, ts: l.ts, empId: l.empId, when: $('w' + l.row).value, type: segVal('t' + l.row), reason: $('r' + l.row).value });
+    }));
+    sheet.querySelectorAll('[data-dovoid]').forEach((b) => (b.onclick = () => {
+      const l = logBy(b.dataset.dovoid);
+      submit(b, { op: 'void', row: l.row, ts: l.ts, empId: l.empId, reason: $('rv' + l.row).value });
+    }));
+    $('addSave').onclick = () => submit($('addSave'), {
+      op: 'add', empId: blank ? $('empSel').value : emp.empId, type: segVal('addType'),
+      when: $('addWhen').value, branch: $('addBranch').value, reason: $('addReason').value
+    });
+  }
+
+  async function submit(btn, payload) {
+    if (!payload.reason || payload.reason.trim().length < 3) { toast('กรุณาใส่เหตุผล', true); return; }
+    if (payload.op !== 'void' && !payload.when) { toast('กรุณาใส่เวลา', true); return; }
+    btn.disabled = true;
+    try {
+      const r = await api(Object.assign({ action: 'mgrCorrect' }, payload));
+      if (!r.ok) throw new Error(r.message);
+      toast('✅ ' + r.message);
+      closeSheet();
+      await load();
+    } catch (e) { toast(e.message || 'บันทึกไม่สำเร็จ', true); }
+    finally { btn.disabled = false; }
+  }
+
+  $('fab').onclick = () => openEditor(S.employees[0] ? S.employees[0].empId : '', true);
+
+  // auto login ภายในแท็บเดิม
+  let saved = '';
+  try { saved = sessionStorage.getItem('mgrPin') || ''; } catch (e) {}
+  if (saved) login(saved);
+})();
+</script>
+</body>
+</html>
